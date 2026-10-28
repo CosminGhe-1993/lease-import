@@ -1,0 +1,73 @@
+1. Spec issues & assumptions
+-F-04 SummaryRequired depends on KpiRequired which does not exist in brief. Marked as a spec defect. Keep safe: return "No", null returned could cause chained reactions that could break the app
+-F-08 ShowMaturityAnalysis mixes AND and OR without brackets. Missing brackets lead to a dual interpretation of the expression: one that is technical, and one that is logical from a realistic perspective. 
+I will use the technical interpretation.
+-F-09 ShowSubleaseDisclosure requires HasSubleases = Yes AND HasLeases = No, which can never be true because there is no sublease if there is no lease
+I will implement it like in the spec because otherwise the output will be changed without author authorization.
+-F-10 ShowCashOutflow compares TotalCashOutflow > 0, but TotalCashOutflow doesn't exist and can't be derived from the data. Returns null, since there is nothing to evaluate.
+
+2.  C# part where CSV is read and json returned.
+-The project will be a console app for the application and for tests it will be xUnit project
+-For amount of money I use decimal, for exact decimal precision.
+-The JSON format is this:
+{
+  "leases": [
+    {
+      "leaseId": "L-2001",
+      "currency": "DKK",
+      "opening": 1250000.50,
+      "additions": 0,
+      "depreciation": 125000.05,
+      "disposals": 0
+    }
+  ],
+  "problems": [
+    {
+      "leaseId": "L-2001",
+      "field": "Opening",
+      "value": "1250000.50",
+      "issue": "describe what the check found"
+    }
+  ]
+}
+leases — a list of lease that passed
+problems — a list where each entry records one issue found and where: leaseId (which row), field (which column), value (the offending value), issue (message). 
+-If a row has more than one problems all of them will be added in problems before going to next row, not only the first one.
+-A row goes to "problems" (not "leases") if: a required field (LeaseId, Currency, or any of the four figures) is missing or empty; a figure doesn't parse as a number; the currency is not a valid ISO-4217 code; the LeaseId is duplicated; or the row doesn't have 8 columns.
+-Currency is trimmed and upper-cased before the ISO-4217 check, so the same currency in a different format isn't seen as two currencies later in Part B.
+-Blank lines are skipped, not reported as problems.
+-Only the fields Part B needs are kept per lease (LeaseId, Currency, and the four figures). AssetClass and Description are dropped because no calculation uses them.
+-EUR is a valid currency, so L-2004 is accepted, not rejected; it only makes MixedCurrency true in Part B. For the sample file everything is valid, so "problems" is empty.
+-Columns are mapped by header name, not by fixed position, so the parser is resilient to column reordering. A column missing from the header is treated as an error.
+-The four figures must be greater than or equal to 0. A negative figure is a problem, since these are monetary amounts and a negative is likely a data error.
+-Every field is trimmed before validation, not only the currency.
+-Figures are parsed with invariant culture (dot as the decimal separator), so a comma decimal fails.
+-For the duplicate check, a LeaseId is added to the seen-set only when the row is fully valid, so a valid row is not lost because an earlier invalid row had the same id.
+-Rows are split with a plain comma split. This is fine for this data, but a comma inside a text field would miscount the columns and show up as a "not 8 columns" problem. This is a known limitation.
+-The ISO-4217 list is built from the .NET installed cultures, not a hardcoded list. This avoids maintaining a list by hand but is environment-dependent.
+
+3. JScript part (Part B) where the fields are calculated.
+-This is classic JScript (ECMAScript 3), run with cscript. Constraints kept: only var, no arrow functions, no JSON.parse, no map/filter/forEach/indexOf, no String.trim.
+-The function is calculate(jsonString, answers). jsonString is Part A's JSON as a string, parsed with the host-provided JsonParser.parse (not JSON.parse). The brief says how it gets there is out of scope.
+-answers is the engagement object with Framework, EntitySize and HasSubleases. The leases and the answers are combined into one input object, then every field is calculated from it.
+-Only the leases array is used. The keys are read in camelCase (currency, opening, additions, depreciation, disposals) to match Part A's output.
+-Part A cleans the data and Part B trusts it, so Part B does no validation.
+-MixedCurrency compares the leases' currencies to each other, not to a reporting currency.
+-The spec decisions are applied here: F-04 SummaryRequired is always "No" (KpiRequired does not exist), F-08 ShowMaturityAnalysis is (HasLeases and IFRS) or (Large) with explicit brackets, F-09 ShowSubleaseDisclosure is left as written (Yes only when there are no leases), F-10 ShowCashOutflow is always null (TotalCashOutflow does not exist). Each of these has a comment in the code.
+-TotalClosing is null when MixedCurrency is "Yes", as the brief states. AverageClosing is null when TotalClosing is null or LeaseCount is 0.
+-With no leases, TotalClosing is 0 (an empty sum) while AverageClosing is null (no division by zero). This matches the rules as written.
+-A custom half-away-from-zero rounding helper is used because ES3 Math.round rounds .5 toward positive infinity and mishandles negatives, and closing values can be negative.
+-Rounding uses JScript doubles, not a decimal type like in C#, so a value sitting exactly on a half-cent could round the wrong way in rare cases. This is a known limitation of the language.
+
+4. Testing
+-Part A has xUnit tests covering a valid file, empty required fields, a non-number figure, a negative figure, an invalid currency, a duplicate LeaseId, wrong column counts (too few and too many), a row with several problems, reordered columns, a header missing a column, an empty file, a header-only file, and whitespace that is trimmed.
+-Part B is tested with hand-written JSON and answers, run with cscript through run.wsf, which includes jsonParserShim.js, then calculate.js, then tests.js in that order.
+-jsonParserShim.js provides JsonParser.parse for WSH, which has no built-in JSON. The JSON is hand-written and trusted, so parse evaluates the text in parentheses.
+-The Part B cases cover two currencies (TotalClosing and AverageClosing null), a single lease, empty leases, a negative closing (negative rounding), amounts that need rounding to 2 decimals, a Large entity with LocalGAAP (ShowMaturityAnalysis "Yes" only through the EntitySize branch), and several leases in one currency (the total sums correctly).
+
+5. AI usage
+-I split the exercise into two parts myself: a C# console app that reads the CSV and writes the JSON (Part A), and a classic JScript function that calculates the fields from that JSON (Part B).
+-I thought through the architecture and how the parsing should work, including mapping the columns dynamically by header name so the parser is not tied to a fixed column order.
+-I decided how the edge cases and the spec defects should be handled myself (F-04, F-08, F-09, F-10) and worked out how each field should behave.
+-I used AI to write the code and the tests, but the design and the test cases were mine. I reviewed what it produced and corrected it where it was wrong, rather than accepting it as is.
+-I also used AI to phrase these notes and the technical questions about the spec defects in clearer, more professional wording.

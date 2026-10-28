@@ -1,0 +1,37 @@
+{
+  "leases": [
+    {
+      "leaseId": "L-2001",
+      "currency": "DKK",
+      "opening": 1250000.50,
+      "additions": 0,
+      "depreciation": 125000.05,
+      "disposals": 0
+    },
+    {
+      "leaseId": "L-2002",
+      "currency": "DKK",
+      "opening": 480000.00,
+      "additions": 60000.00,
+      "depreciation": 96000.00,
+      "disposals": 0
+    },
+    {
+      "leaseId": "L-2003",
+      "currency": "DKK",
+      "opening": 20000.00,
+      "additions": 0,
+      "depreciation": 5000.00,
+      "disposals": 0
+    },
+    {
+      "leaseId": "L-2004",
+      "currency": "EUR",
+      "opening": 300000.00,
+      "additions": 0,
+      "depreciation": 30000.00,
+      "disposals": 0
+    }
+  ],
+  "problems": []
+}

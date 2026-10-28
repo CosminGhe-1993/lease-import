@@ -1,0 +1,5 @@
+<job id="calculateTests">
+    <script language="JScript" src="jsonParserShim.js"/>
+    <script language="JScript" src="calculate.js"/>
+    <script language="JScript" src="tests.js"/>
+</job>
